@@ -1,4 +1,4 @@
-# CARTO Take Home
+# CARTO Data Science Take Home
 
 This is the repository for CARTO data science take home test.
 
