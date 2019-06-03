@@ -24,4 +24,4 @@ The repository is consisted of data, RMarkdown code and report.
 
   **Model Building**
 
-  The model used is linear regression model and it achieves an R-squared of 0.7488.
+  The model used is linear regression model and it achieves an R-squared of 0.7488. (The result of R-squared might be different if you are using RStudio 3.6.0)

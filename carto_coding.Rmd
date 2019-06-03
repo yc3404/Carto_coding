@@ -458,7 +458,7 @@ names(trip_new%>%select(-tip_amount))
 
 I choose the linear regression model because it takes little time to train and the dataset is huge. I am running the model on a 16GB RAM laptop, so it would take a huge amount time to train other models (randomforest). 
 
-```{r}
+```{r,warning=FALSE}
 #set seed
 set.seed(1026)
 
@@ -501,13 +501,15 @@ Here we are going to compare the RMSE, RMSE/mean and R-squared of the models.Alt
 pd_base <- predict(model,test_new)
 RMSE_base <- sqrt(sum((pd_base - test_new$tip_amount)^2)/length(pd_base))
 RMSE_mean_base <- RMSE_base/mean(test_new$tip_amount) 
+R_base <- summary(model)$r.squared
 
 #Compute RMSE for adjusted model
 pd_lm <- predict(model_adjusted,test_new)
 RMSE_lm <- sqrt(sum((pd_lm - test_new$tip_amount)^2)/length(pd_lm))
 RMSE_mean_lm <- RMSE_lm/mean(test_new$tip_amount) 
+R_lm <- summary(model_adjusted)$r.squared
 
-df <- tibble(Model=c("Baseline","Adjusted"),RMSE=c(RMSE_base,RMSE_lm),RMSE_mean=c(RMSE_mean_base,RMSE_mean_lm),R_squared=c(0.6423,0.7488))
+df <- tibble(Model=c("Baseline","Adjusted"),RMSE=c(RMSE_base,RMSE_lm),RMSE_mean=c(RMSE_mean_base,RMSE_mean_lm),R_squared=c(R_base,R_lm))
 kable(df,caption="Model Evaluation")
 ```
 
