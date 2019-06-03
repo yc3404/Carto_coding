@@ -25,7 +25,6 @@ if (!require("tidyverse")) install.packages("tidyverse");library(tidyverse)
 if (!require("ggplot2")) install.packages("ggplot2");library(ggplot2)
 if (!require("data.table")) install.packages("data.table");library(data.table)
 if (!require("lubridate")) install.packages("lubridate");library(lubridate)
-if (!require("gridExtra")) install.packages("gridExtra");library(gridExtra)
 if (!require("DT")) install.packages("DT");library(DT)
 if (!require("caret")) install.packages("caret");library(caret)
 if (!require("ggcorrplot")) install.packages("ggcorrplot");library(ggcorrplot)
@@ -44,7 +43,7 @@ trip_11 <- fread("./data/yellow_tripdata_2017-11.csv")
 
 First, we need to combine these 3 datasets into one and add a column named 'month' to distinguish between different months (March, June, Nov).
 ```{r}
-trip_3$month <- "March"
+trip_3$month <- "Mar"
 trip_6$month <- "June"
 trip_11$month <- "Nov"
 trip <- rbind(trip_3,trip_6,trip_11)
@@ -145,6 +144,13 @@ datatable(trip_new %>% filter(duration == 1440)%>%
 
 trip_new <- trip_new %>% filter(duration < 1440)
 ```
+There is something strange with the passenger count. We can see that the maximum passenger count is 9 people. Is this the only entry? So I am going to filter passenger_count that is greater than 7 people and count the observations. Turns out this is only a tiny percent of the whole data set. Therefore, I remove the entries with passenger_count larger than 7.
+```{r}
+nrow(trip_new %>% filter(passenger_count >= 7)) #only 9 entries for passenger_count greater than 7 people
+
+trip_new <- trip_new %>% filter(passenger_count < 7)
+
+```
 
 I also checked for unique id columns. This is because the columns with unique id can not be used as features as they are unique in time and space and will cause overfitting. Fortunately, the dataset does not have unique id columns.
 
@@ -157,7 +163,11 @@ length(unique(trip_new$DOLocationID)) == length(trip_new$DOLocationID)
 #Because those id columns are not unique, we can safely use them as features
 ```
 
-### Removing outliers
+
+# Data Summary
+## Interesting trends
+
+### Checking outliers
 
 By insepecting the summary statistics, I noticed that several columns include some unreasonable outliers: fare_amount, total_amount,extra,mta_tax,tolls_amount and duration.
 ```{r}
@@ -219,60 +229,12 @@ plots(box_fare,box_total,box_extra,box_mta,box_toll,box_dur,ncol=2)
 ```
 
 
-
-Because these outliers are very extreme, then we will remove values outside of three standard deviations of that column's average.
-```{r}
-trip_new <- trip_new %>% group_by(month) %>% 
-  mutate(avg_fare = mean(fare_amount),
-         sd_fare = sd(fare_amount),
-         avg_total = mean(total_amount),
-         sd_total = sd(total_amount),
-         avg_extra = mean(extra),
-         sd_extra = sd(extra),
-         avg_mta = mean(mta_tax),
-         sd_mta = sd(mta_tax),
-         avg_toll = mean(tolls_amount),
-         sd_toll = sd(tolls_amount),
-         avg_dur = mean(duration),
-         sd_dur = sd(duration)) %>%
-  filter(fare_amount < avg_fare + 1.5*sd_fare,
-         fare_amount > avg_fare - 1.5*sd_fare,
-         total_amount < avg_total + 1.5*sd_total,
-         total_amount > avg_total - 1.5*sd_total,
-         extra < avg_extra + 1.5*sd_extra,
-         extra > avg_extra - 1.5*avg_extra,
-         mta_tax < avg_mta + 1.5*sd_mta,
-         mta_tax > avg_mta - 1.5*sd_mta,
-         tolls_amount < avg_toll + 1.5*sd_toll,
-         tolls_amount > avg_toll - 1.5*sd_toll,
-         duration < avg_dur + 1.5*sd_dur,
-         duration > avg_dur - 1.5*sd_dur) %>%
-  select(-c(avg_fare,sd_fare,avg_total,sd_total,avg_extra,sd_extra,avg_mta,sd_mta,
-         avg_toll,sd_toll,avg_dur,sd_dur))%>%
-  ungroup()
-```
-
-
-
-
-# Data Summary
-## Interesting trends
-
-It seems people barely take taxi on Tuesdays and Sundays. Most taxi rides happen on Thursdays and Fridays. It is also strange that the data set does not contain observations on Mondays.
-
-I also noticed that people tend to be generous in giving tips in the middle of the week.
+I noticed that people tend to be generous in giving tips in the middle of the week.
 
 ```{r}
 trip_new$weekday <- factor(trip_new$weekday,
                            levels=c("Tuesday","Wednesday","Thursday",
                            "Friday","Saturday","Sunday"))
-ggplot(trip_new,aes(weekday))+
-  geom_bar(fill="#00b0ff")+
-  geom_text(stat='count',aes(label=..count..),vjust=1)+
-  labs(title="Histogram of Days in the Week\n",
-       y = "Count",
-       x = "Days in the Week")+
-  theme_minimal()
 
 trip_new %>% group_by(weekday) %>% summarise(mean_tip = mean(tip_amount))%>%
   ungroup()%>%
@@ -286,13 +248,13 @@ trip_new %>% group_by(weekday) %>% summarise(mean_tip = mean(tip_amount))%>%
 ```
 
 
-I am curious about if weekends will affect tip amount. So I plot the average tip amount of weekends VS weekdays for March, June and November. Then I discovered in spring and summer, people tend to give less tips on weekends. But in winter, the tip amount is approximately the same for weekdays and weekends. 
+I am curious about if weekends will affect tip amount. So I plot the average tip amount of weekends VS weekdays for March, June and November. Then I discovered that people tend to give less tips on weekends.
 
 ```{r}
-trip_new$month <- factor(trip_new$month,levels=c("March","June","Nov"))
+trip_new$month <- factor(trip_new$month,levels=c("Mar","June","Nov"))
 weekend <- c("Saturday","Sunday")
 trips <- trip_new %>% 
-  mutate(weekend = ifelse(weekdays(tpep_pickup_datetime) %in% weekend,"Y","N"))%>%
+  mutate(weekend = ifelse(weekdays(tpep_pickup_datetime) %in% weekend,"Weekend","Weekday"))%>%
   group_by(month,weekend)%>%
   summarise(mean_tip=mean(tip_amount))%>%
   ungroup()
@@ -302,12 +264,12 @@ ggplot(trips,aes(x=weekend,y=mean_tip,fill=weekend))+
   facet_wrap(~month)+
   labs(title="Average Tip Amount for Weekends VS Weekdays\n",
        y = "Tip Amount ($)\n",
-       x = "Weekend")+
+       x = "Weekend/Weekday")+
   scale_fill_material()+
   theme_minimal()
 ```
 
-From the line plot, we can see the tip amount varies as time goes. The peak occurs at arround midnight, and the bottom occurs at 5:00 AM. It is also interesting to see the tip amount increases till he start of morning rush hour and decreases as rush hour proceeds. 
+From the line plot, we can see the tip amount varies as time goes. The peak occurs at 5:00AM, and the bottom occurs at 3:00 AM. It is also interesting to see the tip amount starts to increase from morning to evening.
 
 ```{r}
 trip_new %>% group_by(pickup_hour) %>% summarise(mean_tip = mean(tip_amount))%>%
@@ -315,7 +277,7 @@ trip_new %>% group_by(pickup_hour) %>% summarise(mean_tip = mean(tip_amount))%>%
   ggplot(aes(x=pickup_hour,y=mean_tip))+
   geom_point(color="#1565c0")+
   geom_line(color="#1565c0")+
-  labs(title="Average Tip Amount per Pickup Hour\n",
+  labs(title="Average Tip Amount by Pickup Hour\n",
        y = "Tip Amount ($)\n",
        x = "Pickup Hour")+
   theme_minimal()
@@ -323,7 +285,9 @@ trip_new %>% group_by(pickup_hour) %>% summarise(mean_tip = mean(tip_amount))%>%
 
 I am also interested in the number of passengers in the taxi. Would that impact the tip amount? So I first count the distribution of passenger number and I found out most people ride taxi alone. 
 
-I also found out the number of passenger seems not impacting tip amount a lot. The extreme high average tip amount for 9 people is because we have very few records of 9 passengers in a car. 
+When four people are riding in a taxi, they give the least tip. But when the person is riding taxi alone, the tip amount is very generous.
+
+
 ```{r}
 #passenger count
 ggplot(trip_new,aes(passenger_count))+
@@ -341,7 +305,7 @@ trip_new %>% group_by(passenger_count) %>%
 ggplot(aes(x=passenger_count,y=mean_tip))+
   geom_point(color="#1565c0")+
   geom_line(color="#1565c0")+
-  labs(title="Average Tip Amount per Passenger Count\n",
+  labs(title="Average Tip Amount by Passenger Count\n",
        y = "Tip Amount ($)",
        x = "Passenger Count")+
   theme_minimal()
@@ -371,7 +335,7 @@ trip_new %>% group_by(month,day) %>%
 
 Another attribute that could be related to tip amount is trip_distance. Since we calculate the fare amount based on trip distance and calculate tip as certain percent of fare amount. So I plot trip_distance vs average tip amount and add a trend line to show the trend.
 
-From the plot we can see that there is a positive relationship between trip_distance and average tip amount. So we might use this column as a core feature. 
+From the plot we can see that there is a positive relationship between trip_distance and average tip amount. So we might use this column as a core feature. I also noticed that the relationship seems linear from 0 miles to 10 miles, but there are some extreme outliers at the right side of the graph that drags the slope down. And I inspected the size of the outliers (trip distance > 10 miles) and found out the size was very tiny. We could remove those outliers to best capture the linear relationship.
 
 ```{r}
 trip_new %>% group_by(trip_distance)%>%
@@ -386,10 +350,14 @@ trip_new %>% group_by(trip_distance)%>%
        y = "Tip Amount ($)\n",
        x = "Trip Distance (Miles)")+
   theme_minimal()
+
 ```
 
-I also explored the relationship between trip duration and average tip amount. The relationship seems pretty positive until trip_duration greater than 40 minutes. I also added a trendline and it shows that the relationship is positive.
-Therefore, I would use duration as a core feature.
+
+
+I also explored the relationship between trip duration and average tip amount. The relationship seems pretty positive at the begining, but at the right side of the graph, there are a cluster of outliers draggin the trend line down.
+
+We could remove those outliers later in the model fitting part to better capture the linear relationship.
 
 ```{r}
 trip_new %>% group_by(duration)%>%
@@ -405,6 +373,8 @@ trip_new %>% group_by(duration)%>%
        x = "Trip Duration (Min)")+
   theme_minimal()
 ```
+
+
 
 ## Feature Selection
 
@@ -432,9 +402,7 @@ names(t)[highcorr]
 trip_new <- trip_new %>% select(-c(total_amount,fare_amount))
 ```
 
-Because we have used the pickup and dropoff column to calculate the trip duration,then we can drop those two columns. Then I used the variable importance function to exclude some low importance features from the dataset: RatecodeID, store_and_fwd_flag, improvement_surcharge, tolls_amount, mta_tax, PULocationID, DOLocationID, weekday,day,passenger_count.
-
-The passenger_count's variable importance is around 6. But the previous data exploration shows that this feature does not play a large part, so I excluded it.
+Because we have used the pickup and dropoff column to calculate the trip duration,then we can drop those two columns. Then I used the variable importance function to exclude some low importance features from the dataset: VendorID,RatecodeID, store_and_fwd_flag,passenger_count, improvement_surcharge, mta_tax, PULocationID, DOLocationID, extra, and weekday.
 
 ```{r}
 trip_new <- trip_new %>% select(-c(tpep_pickup_datetime,tpep_dropoff_datetime))
@@ -443,8 +411,10 @@ trip_new <- trip_new %>% select(-c(tpep_pickup_datetime,tpep_dropoff_datetime))
 model1 <- lm(tip_amount~.,data=trip_new)
 varImp(model1)
 
-trip_new <- trip_new %>% select(-c(RatecodeID,store_and_fwd_flag,improvement_surcharge,mta_tax,                                   PULocationID,DOLocationID,day,tolls_amount,
-                      weekday,passenger_count))
+trip_new <- trip_new %>% 
+  select(-c(RatecodeID,VendorID,passenger_count,store_and_fwd_flag,
+            improvement_surcharge,mta_tax,extra,                                                   PULocationID,DOLocationID,
+                      weekday))
 ```
 
 ## Core features
@@ -468,6 +438,17 @@ train_sample <- sample(nrow(trip_new), size = nrow(trip_new)*0.66)
 train_new <-  trip_new[train_sample,]
 test_new <-  trip_new[-train_sample,]
 
+#Removing outliers for train set
+train_new <- train_new %>% group_by(month) %>% 
+  mutate(
+         avg_dur = mean(duration),
+         sd_dur = sd(duration)) %>%
+  filter(
+         duration < avg_dur + 1.5*sd_dur,
+         duration > avg_dur - 1.5*sd_dur) %>%
+  select(-c(avg_dur,sd_dur))%>%
+  ungroup()
+
 
 #original model
 model <- lm(tip_amount~.,data=train_new)
@@ -477,7 +458,7 @@ summary(model)
 cooksd <- cooks.distance(model)
 #use cook distance to remove outliers
 influential <- as.numeric(names(cooksd)[(cooksd > (4/nrow(train_new)))])
-train_screen <- train_new[-influential,]
+train_screen <- train_new[-na.omit(influential),]
 
 #adjusted model
 model_adjusted <- lm(tip_amount~.,data=train_screen)
