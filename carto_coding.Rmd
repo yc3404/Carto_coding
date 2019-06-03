@@ -60,7 +60,7 @@ kable(summary(trip)[,6:11])
 ```
 
 ```{r}
-kable(summary(trip)[,12:17])
+kable(summary(trip)[,12:18])
 ```
 
 ### Removing duplicates
@@ -74,6 +74,8 @@ trip_new <- trip[-which(duplicated(trip)),]
 ### Converting columns
 
 Then we need to convert the pickup and dropoff column into datetime types. We can also derive a column that describes the trip duration from the time difference between pickup and dropoff. 
+
+Besides the duration column, we can also add columns that describe pickup hour, pickup day of the week and peekup day of the month. I named them as pickup_hour, weekday and day.
 ```{r}
 trip_new$tpep_pickup_datetime <- mdy_hm(trip_new$tpep_pickup_datetime)
 trip_new$tpep_dropoff_datetime <- mdy_hm(trip_new$tpep_dropoff_datetime)
@@ -89,7 +91,7 @@ trip_new <- trip_new %>% mutate(pickup_hour = hour(tpep_pickup_datetime),
 
 ### Factoring specific columns
 
-Some columns need to be factored: VendorID, RatecodeID, Store_and_fwd_flag and payment_type. So we need to factor these columns for each dataset.
+Some columns need to be factored: VendorID, RatecodeID, Store_and_fwd_flag, payment_type, month and weekday. So we need to factor these columns for each dataset.
 
 ```{r}
 trip_new <- mutate_each(trip_new,list(factor),c(VendorID,RatecodeID,store_and_fwd_flag,payment_type,month,weekday))
@@ -132,7 +134,7 @@ trip_new <- trip_new %>% filter(!duration == 0 & total_amount > 0)
 summary(trip_new$duration)
 ```
 
-There is still something wrong with the duration because we observed the minimum trip duration is 0 minute. This is still counterintuitive. So we need to filter out those entries with 0 minute duration but larger than 0 fare amount.
+There is still something wrong with the duration because we observed the minimum trip duration is 0 minute. This is still counterintuitive. So we need to filter out those entries with 0 minute duration but larger than $0 fare amount.
 
 Then we check the summary statistics again, but found out now the maximum trip duration becomes 1440 minutes, which is 24 hours. Then I extracted those trips with 24 hour duration, but found out that they all have a very low fare amount. So these entries are incorrect data again, and we need to exclude them.
 ```{r}
@@ -144,6 +146,7 @@ datatable(trip_new %>% filter(duration == 1440)%>%
 trip_new <- trip_new %>% filter(duration < 1440)
 ```
 
+I also checked for unique id columns. This is because the columns with unique id can not be used as features as they are unique in time and space and will cause overfitting. Fortunately, the dataset does not have unique id columns.
 
 ```{r}
 #check if there are unique id columns
@@ -156,7 +159,7 @@ length(unique(trip_new$DOLocationID)) == length(trip_new$DOLocationID)
 
 ### Removing outliers
 
-By insepecting the summary statistics, I noticed that several columns include some unreasonable outliers: fare_amount, total_amount,extra,mta_tax and tolls_amount.
+By insepecting the summary statistics, I noticed that several columns include some unreasonable outliers: fare_amount, total_amount,extra,mta_tax,tolls_amount and duration.
 ```{r}
 #boxplot for fare amount
 box_fare <- ggplot(trip_new,aes(x=month,y=fare_amount,color=month))+
@@ -255,7 +258,7 @@ trip_new <- trip_new %>% group_by(month) %>%
 # Data Summary
 ## Interesting trends
 
-It seems people barely take taxi on Tuesdays and Sundays. Most taxi rides happen on Thursdays and Fridays.
+It seems people barely take taxi on Tuesdays and Sundays. Most taxi rides happen on Thursdays and Fridays. It is also strange that the data set does not contain observations on Mondays.
 
 I also noticed that people tend to be generous in giving tips in the middle of the week.
 
@@ -304,7 +307,7 @@ ggplot(trips,aes(x=weekend,y=mean_tip,fill=weekend))+
   theme_minimal()
 ```
 
-From the line plot, we can see the tip amount varies as time goes. The peak occurs at arround midnight, and the bottom occurs at 5:00 AM. It is also interesting to see the tip amount increases to the start of morning rush hour and decreases as rush hour proceeds. 
+From the line plot, we can see the tip amount varies as time goes. The peak occurs at arround midnight, and the bottom occurs at 5:00 AM. It is also interesting to see the tip amount increases till he start of morning rush hour and decreases as rush hour proceeds. 
 
 ```{r}
 trip_new %>% group_by(pickup_hour) %>% summarise(mean_tip = mean(tip_amount))%>%
@@ -317,6 +320,7 @@ trip_new %>% group_by(pickup_hour) %>% summarise(mean_tip = mean(tip_amount))%>%
        x = "Pickup Hour")+
   theme_minimal()
 ```
+
 I am also interested in the number of passengers in the taxi. Would that impact the tip amount? So I first count the distribution of passenger number and I found out most people ride taxi alone. 
 
 I also found out the number of passenger seems not impacting tip amount a lot. The extreme high average tip amount for 9 people is because we have very few records of 9 passengers in a car. 
@@ -428,7 +432,7 @@ names(t)[highcorr]
 trip_new <- trip_new %>% select(-c(total_amount,fare_amount))
 ```
 
-Because we have used the pickup and dropoff column to calculate the trip duration,then we can drop those two columns. Then I used the variable importance function to exclude some low importance features from the dataset: RatecodeID, store_and_fwd_flag, improvement_surcharge, tolls_amount, mta_tax, PULocationID, DOLocationID, weekday,day and passenger_count.
+Because we have used the pickup and dropoff column to calculate the trip duration,then we can drop those two columns. Then I used the variable importance function to exclude some low importance features from the dataset: RatecodeID, store_and_fwd_flag, improvement_surcharge, tolls_amount, mta_tax, PULocationID, DOLocationID, weekday,day,passenger_count.
 
 The passenger_count's variable importance is around 6. But the previous data exploration shows that this feature does not play a large part, so I excluded it.
 
