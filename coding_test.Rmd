@@ -1,5 +1,5 @@
 ---
-title: "Carto coding exercise"
+title: "Data Science Coding Test"
 author: "Yang Cai"
 date: "May 30, 2019"
 output: 

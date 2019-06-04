@@ -1,6 +1,6 @@
 # CARTO Data Science Take Home
 
-This is the repository for CARTO data science take home test.
+This is the repository for data science take home test.
 
 The repository is consisted of data, RMarkdown code and report. 
 
@@ -12,7 +12,7 @@ The repository is consisted of data, RMarkdown code and report.
 
 + RMarkdown code and report
 
-  carto_coding.Rmd and carto_coding.html are the code and report for this task. You can use     RStudio or Markdown reader to open the Rmd file. The html file can be opened via a web browser. 
+  coding_test.Rmd and coding_test.html are the code and report for this task. You can use     RStudio or Markdown reader to open the Rmd file. The html file can be opened via a web browser. 
 
   The goal of this take home is to build a model that predicts tip amount for a new ride sharing company in NYC based on the New York taxi data. 
 
